@@ -687,8 +687,8 @@
       const st = inkStore.get(currentPage);
       if (!st || !st[strokeIndex] || !st[strokeIndex].points) return;
       const s = st[strokeIndex];
-      // Minimal points
-      if (s.type || s.points.length < 5) return;
+      // Validasi ketat sesuai perintah agar tipe path saja yang diteruskan
+      if (s.type !== 'path' || !s.points || s.points.length < 10) return;
 
       const pts = s.points;
       let len = 0, mx = pts[0].x, kx = pts[0].x, my = pts[0].y, ky = pts[0].y;
@@ -702,8 +702,8 @@
       const dist = Math.hypot(end.x - start.x, end.y - start.y);
       const w = kx - mx, h = ky - my;
 
-      // LINE DETECTION: 0.75 (Longgarkan Threshold seperti permintaan)
-      if (dist / len > 0.75 || dist > Math.max(w, h) * 0.8) {
+      // LINE DETECTION: 0.65 (Sensitivitas dipertajam agar gampang deteksi garis lurus)
+      if (dist / len > 0.65 || dist > Math.max(w, h) * 0.8) {
         let finalStart = { ...start };
         let finalEnd = { ...end };
 
@@ -724,9 +724,9 @@
         pts.forEach(p => varR += Math.abs(Math.hypot(p.x - cx, p.y - cy) - r));
         varR /= pts.length;
 
-        // HIGH TOLERANCE FOR CIRCLE: Nilai toleransi ditingkatkan -> varR < r * 0.65
+        // HIGH TOLERANCE FOR CIRCLE: diset ke 0.45 sesuai request
         const aspect = w / (h || 0.001);
-        if (varR < r * 0.65 && aspect > 0.4 && aspect < 2.5) {
+        if (varR < r * 0.45 && aspect > 0.4 && aspect < 2.5) {
           st[strokeIndex] = { type: 'circle', color: s.color, size: s.size, cx, cy, r, w, h };
           toast('⭕ Lingkaran');
         } else {
