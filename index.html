@@ -588,6 +588,7 @@
   </div>
 
   <div id="toast"></div>
+  <video id="cam-el" style="display:none;" autoplay playsinline></video>
   <div id="loading">
     <div class="spinner"></div>
     <div style="margin-top:10px;font-size:13px;" id="load-msg">Memuat…</div>
@@ -595,6 +596,7 @@
 
   <script>
     'use strict';
+    const camEl = document.getElementById('cam-el');
     const { jsPDF } = window.jspdf;
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
@@ -776,10 +778,6 @@
     }
 
     function ptEnd() {
-      if (isDrawing && smartShape) {
-        const st = inkStore.get(currentPage);
-        processShape(st.length - 1);
-      }
       isDrawing = false;
       draggingShape = null;
     }
@@ -930,19 +928,19 @@
       camEl.srcObject = null;
     }
 
-    // Drive MediaPipe with rAF after stream is live — avoids re-opening camera
     function startHandLoop() {
       async function loop() {
-        if (!activeStream) return;
+        if (!activeStream || !camEl) return;
         if (camEl.readyState >= 2) {
-          try { await hands.send({ image: camEl }); } catch (e) { }
+          try {
+            await hands.send({ image: camEl });
+          } catch (e) { }
         }
         rafId = requestAnimationFrame(loop);
       }
       rafId = requestAnimationFrame(loop);
     }
 
-    // THE FIX: get stream ONCE via getUserMedia, keep it alive, feed to rAF loop
     async function requestCameraPermission() {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         setCamStatus('❌', 'Browser tidak mendukung akses kamera.', '#C0392B');
@@ -951,35 +949,32 @@
       }
       setCamStatus('⏳', 'Menunggu izin kamera...', 'var(--text-muted)');
       btnStart.disabled = true;
-      stopCamera(); // clean up any previous attempt
+      stopCamera();
 
       try {
-        // ONE call — gets permission popup AND the live stream
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }
         });
         activeStream = stream;
 
-        // Pipe stream to hidden processing video
-        camEl.srcObject = stream;
-        // Also pipe to visible background layer (for free mode AR background)
-        const camLayer = $('cam-layer');
+        if (camEl) camEl.srcObject = stream;
+        const camLayer = document.getElementById('cam-layer');
         if (camLayer) camLayer.srcObject = stream;
 
         setCamStatus('⏳', 'Memuat model AI...', 'var(--text-muted)');
         btnStart.style.display = 'none';
 
-        // Wait for video to be ready, then start hand detection loop
-        camEl.onloadedmetadata = () => {
-          camEl.play().then(() => {
-            if (camLayer) camLayer.play().catch(() => { });
-            setCamStatus('✅', 'AI & Kamera Aktif!', 'var(--sage-dark)');
-            btnSkip.style.display = 'none';
-            setCamHint('');
-            startHandLoop();
-          }).catch(e => setCamStatus('⚠️', 'Video gagal: ' + e.message, '#D68910'));
-        };
-
+        if (camEl) {
+          camEl.onloadedmetadata = () => {
+            camEl.play().then(() => {
+              if (camLayer) camLayer.play().catch(() => { });
+              setCamStatus('✅', 'AI & Kamera Aktif!', 'var(--sage-dark)');
+              btnSkip.style.display = 'none';
+              setCamHint('');
+              startHandLoop();
+            }).catch(e => setCamStatus('⚠️', 'Video gagal: ' + e.message, '#D68910'));
+          };
+        }
       } catch (err) {
         btnStart.disabled = false;
         console.error('Camera error:', err.name, err.message);
@@ -992,7 +987,6 @@
         setCamStatus(icon, msg, '#C0392B');
         setCamHint(hint);
         btnStart.textContent = '🔄 Coba Lagi';
-        btnStart.style.display = 'inline-block';
         btnStart.style.display = 'inline-block';
       }
     }
