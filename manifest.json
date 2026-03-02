@@ -1,0 +1,17 @@
+{
+  "name": "BioNotes Handwritten AI",
+  "short_name": "BioNotes",
+  "description": "Handwritten AI Annotator & Canvas",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#F0F3F1",
+  "theme_color": "#6B9080",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
