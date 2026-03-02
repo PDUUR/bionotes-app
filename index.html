@@ -664,7 +664,18 @@
       const W = inkCanvas.width, H = inkCanvas.height;
 
       st.forEach(s => {
-        inkCtx.beginPath(); inkCtx.strokeStyle = s.color; inkCtx.lineWidth = s.size;
+        inkCtx.beginPath();
+
+        if (s.type === 'eraser') {
+          inkCtx.globalCompositeOperation = 'destination-out';
+          inkCtx.strokeStyle = 'rgba(0,0,0,1)';
+          inkCtx.lineWidth = Math.max(s.size * 3, 20); // Make eraser thicker
+        } else {
+          inkCtx.globalCompositeOperation = 'source-over';
+          inkCtx.strokeStyle = s.color;
+          inkCtx.lineWidth = s.size;
+        }
+
         inkCtx.lineCap = 'round'; inkCtx.lineJoin = 'round';
 
         if (s.type === 'line') {
@@ -680,6 +691,7 @@
         }
         inkCtx.stroke();
       });
+      inkCtx.globalCompositeOperation = 'source-over'; // safety reset
     }
 
     function processShape(strokeIndex) {
@@ -758,18 +770,18 @@
       return { x: (cx - r.left) / r.width, y: (cy - r.top) / r.height };
     }
 
-    function ptStart(nx, ny) {
+    function ptStart(nx, ny, isEraser = false) {
       draggingShape = hitShape(nx, ny);
-      if (draggingShape && !drawEnabled) {
+      if (draggingShape && !drawEnabled && !isEraser) {
         if (draggingShape.type === 'rect') { dragOffsetX = nx - draggingShape.x; dragOffsetY = ny - draggingShape.y; }
         else if (draggingShape.type === 'circle') { dragOffsetX = nx - draggingShape.cx; dragOffsetY = ny - draggingShape.cy; }
         else if (draggingShape.type === 'line') { dragOffsetX = nx - draggingShape.start.x; dragOffsetY = ny - draggingShape.start.y; }
         return;
       }
-      if (!drawEnabled) return;
+      if (!drawEnabled && !isEraser) return;
       isDrawing = true;
       if (!inkStore.has(currentPage)) inkStore.set(currentPage, []);
-      inkStore.get(currentPage).push({ type: 'path', color: penColor, size: penSize, points: [{ x: nx, y: ny }] });
+      inkStore.get(currentPage).push({ type: isEraser ? 'eraser' : 'path', color: penColor, size: penSize, points: [{ x: nx, y: ny }] });
     }
 
     function ptMove(nx, ny) {
@@ -876,6 +888,7 @@
         // Gestures
         const iUp = lm[8].y < lm[6].y, mUp = lm[12].y < lm[10].y, rUp = lm[16].y < lm[14].y, pUp = lm[20].y < lm[18].y;
         const isV = iUp && mUp && !rUp && !pUp;
+        const isThree = iUp && mUp && rUp && !pUp;
         const isFive = iUp && mUp && rUp && pUp;
         const isPoint = iUp && !mUp && !rUp && !pUp;
         const pinch = Math.hypot(tip.x - thumb.x, tip.y - thumb.y) < 0.05;
@@ -893,6 +906,9 @@
             lastShapeTog = now;
           }
           ptEnd();
+        } else if (isThree) { // 3 Fingers -> Eraser
+          if (!isDrawing) ptStart(nx, ny, true); else ptMove(nx, ny);
+          $('hand-cursor').classList.add('active');
         } else if (isPoint && !pinch && drawEnabled) {
           if (!isDrawing) ptStart(nx, ny); else ptMove(nx, ny);
           $('hand-cursor').classList.add('active');
