@@ -1,126 +1,1114 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
+
 <head>
-  <title>ramadan pen</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+  <title>BioNotes — Smart Hand Annotator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap"
+    rel="stylesheet" />
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
   <style>
-    body { margin: 0; background: #050301; overflow: hidden; }
-    video { display: none; }
-    canvas { width: 100%; height: 100%; transform: scaleX(-1); position: absolute; z-index: 1; }
+    :root {
+      --bg: #F5F4F0;
+      --surface: #FFFFFF;
+      --surface-2: #EDECE8;
+      --sage: #A3B18A;
+      --sage-dark: #7D9268;
+      --sage-light: #D4E2C8;
+      --navy: #1B2A4A;
+      --text: #2C2C2C;
+      --text-muted: #8A8A8A;
+      --border: #E2E0DA;
+      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.07);
+      --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.10);
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-pill: 50px;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      font-family: 'Poppins', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+      touch-action: none;
+      user-select: none;
+    }
+
+    .screen {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.4s ease;
+    }
+
+    .screen.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* LANDING */
+    #screen-landing {
+      background: var(--bg);
+      padding: 32px 24px;
+    }
+
+    .landing-header {
+      text-align: center;
+      margin-bottom: 44px;
+    }
+
+    .landing-logo {
+      width: 64px;
+      height: 64px;
+      border-radius: 18px;
+      font-size: 28px;
+      background: linear-gradient(135deg, var(--sage) 0%, var(--sage-dark) 100%);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--shadow-md);
+      margin-bottom: 16px;
+    }
+
+    .landing-title {
+      font-size: clamp(26px, 7vw, 36px);
+      font-weight: 700;
+      color: var(--navy);
+    }
+
+    .landing-sub {
+      font-size: 14px;
+      color: var(--text-muted);
+      font-family: 'Inter', sans-serif;
+    }
+
+    .mode-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      width: 100%;
+      max-width: 540px;
+    }
+
+    .mode-card {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 22px;
+      padding: 28px 20px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      transition: transform 0.2s, border-color 0.2s;
+      box-shadow: var(--shadow-sm);
+      text-align: center;
+    }
+
+    .mode-card:hover {
+      transform: translateY(-3px);
+      border-color: var(--sage);
+    }
+
+    .mode-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+    }
+
+    .mode-icon.free {
+      background: #E8F4FD;
+    }
+
+    .mode-icon.doc {
+      background: #F0F4EE;
+    }
+
+    .mode-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--navy);
+    }
+
+    .mode-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: 'Inter', sans-serif;
+    }
+
+    /* EDITOR */
+    #screen-editor {
+      background: var(--bg);
+      align-items: stretch;
+      justify-content: flex-start;
+    }
+
+    #topbar {
+      position: relative;
+      z-index: 40;
+      height: 52px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 8px;
+      box-shadow: var(--shadow-sm);
+      flex-shrink: 0;
+    }
+
+    .btn-icon {
+      width: 36px;
+      height: 36px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      color: var(--text-muted);
+    }
+
+    .btn-icon:active {
+      background: var(--surface-2);
+    }
+
+    #mode-badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+      background: var(--sage-light);
+      color: var(--sage-dark);
+    }
+
+    #doc-name {
+      flex: 1;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      font-family: 'Inter', sans-serif;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin: 0 4px;
+    }
+
+    #canvas-wrap {
+      position: relative;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    #layer-container {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      transform-origin: 50% 50%;
+      transition: transform 0.1s;
+    }
+
+    #cam-layer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+      opacity: 0.06;
+      pointer-events: none;
+    }
+
+    #doc-layer,
+    #ink-layer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+
+    #doc-layer {
+      pointer-events: none;
+    }
+
+    #hand-cursor {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--sage);
+      border: 2px solid #fff;
+      box-shadow: 0 0 10px rgba(163, 177, 138, 0.7);
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      z-index: 50;
+      opacity: 0;
+      transition: width 0.1s, height 0.1s;
+    }
+
+    #hand-cursor.active {
+      background: var(--navy);
+      width: 12px;
+      height: 12px;
+    }
+
+    #toolbar {
+      position: relative;
+      z-index: 40;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      overflow-x: auto;
+      flex-shrink: 0;
+      scrollbar-width: none;
+    }
+
+    #toolbar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .tb-sep {
+      width: 1px;
+      height: 28px;
+      background: var(--border);
+      flex-shrink: 0;
+    }
+
+    .swatch {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 2.5px solid transparent;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .swatch.selected {
+      border-color: var(--navy);
+      transform: scale(1.12);
+    }
+
+    .tb-btn {
+      padding: 6px 12px;
+      border-radius: var(--radius-pill);
+      border: 1.5px solid var(--border);
+      background: var(--surface);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--navy);
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .tb-btn.active {
+      background: var(--sage);
+      color: #fff;
+      border-color: var(--sage-dark);
+    }
+
+    .tb-btn.warning {
+      border-color: #F5B041;
+      color: #D68910;
+    }
+
+    .tb-btn.danger {
+      border-color: #E57373;
+      color: #C0392B;
+    }
+
+    #page-nav {
+      position: absolute;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.92);
+      border-radius: var(--radius-pill);
+      padding: 6px 14px;
+      box-shadow: var(--shadow-md);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #page-nav.visible {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .pnav-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #toast {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 99;
+      background: var(--navy);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 10px 20px;
+      border-radius: var(--radius-pill);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+
+    #toast.show {
+      opacity: 1;
+    }
+
+    #loading {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: rgba(245, 244, 240, 0.88);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #loading.show {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .spinner {
+      width: 38px;
+      height: 38px;
+      border: 3px solid var(--border);
+      border-top-color: var(--sage);
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    #upload-prompt {
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #upload-prompt.hidden {
+      display: none;
+    }
+
+    .upload-box {
+      width: min(320px, 86vw);
+      background: var(--surface);
+      border: 2px dashed var(--border);
+      border-radius: var(--radius-md);
+      padding: 36px 24px;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    #smart-indicator {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 45;
+      background: rgba(163, 177, 138, 0.9);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 12px;
+      display: none;
+      box-shadow: var(--shadow-sm);
+      pointer-events: none;
+    }
+
+    video#cam-el {
+      position: absolute;
+      top: -1000px;
+      left: -1000px;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #file-input {
+      display: none;
+    }
   </style>
 </head>
+
 <body>
-  <video id="vid"></video>
-  <canvas id="c"></canvas>
+
+  <video id="cam-el" playsinline muted autoplay></video>
+  <input type="file" id="file-input" accept="application/pdf,image/*" />
+
+  <!-- LANDING -->
+  <div class="screen" id="screen-landing">
+    <div class="landing-header">
+      <div class="landing-logo">✨</div>
+      <div class="landing-title">BioNotes AI</div>
+      <div class="landing-sub">Coretan cerdas. Bentuk presisi. Secara otomatis.</div>
+    </div>
+    <div class="mode-grid">
+      <div class="mode-card" id="btn-free-mode">
+        <div class="mode-icon free">✍️</div>
+        <div class="mode-title">Catatan Kosong</div>
+        <div class="mode-desc">Kanvas AR dengan pelacak rangka jari</div>
+      </div>
+      <div class="mode-card" id="btn-doc-mode">
+        <div class="mode-icon doc">📄</div>
+        <div class="mode-title">Anotasi Dokumen</div>
+        <div class="mode-desc">Buka PDF/Gambar & tambah catatan</div>
+      </div>
+    </div>
+    <div id="cam-status-wrap" style="margin-top:24px; text-align:center; font-family:'Inter',sans-serif;">
+      <div id="cam-status" style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">⏳ Memeriksa library
+        AI...</div>
+      <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+        <button id="btn-start-camera"
+          style="padding:10px 22px; border-radius:14px; border:1.5px solid var(--sage); background:var(--sage); color:#fff; cursor:pointer; font-weight:700; font-size:13px; display:none;">📷
+          Aktifkan Kamera</button>
+        <button id="btn-skip-camera"
+          style="padding:10px 20px; border-radius:14px; border:1.5px solid var(--border); background:#fff; color:var(--navy); cursor:pointer; font-weight:600; font-size:13px;">✏️
+          Gunakan Sentuhan Saja</button>
+      </div>
+      <div id="cam-hint"
+        style="margin-top:10px; font-size:11px; color:var(--text-muted); display:none; max-width:320px; margin-left:auto; margin-right:auto;">
+      </div>
+    </div>
+  </div>
+
+  <!-- EDITOR -->
+  <div class="screen hidden" id="screen-editor">
+    <div id="topbar">
+      <button class="btn-icon" id="btn-home">🏠</button>
+      <span id="mode-badge">Mode</span>
+      <span id="doc-name"></span>
+      <button class="btn-icon" id="btn-upload-top" style="margin-left:auto;display:none;">📂</button>
+      <button class="btn-icon" id="btn-save">💾</button>
+    </div>
+
+    <div id="canvas-wrap">
+      <div id="layer-container">
+        <video id="cam-layer" playsinline muted autoplay></video>
+        <canvas id="doc-layer"></canvas>
+        <canvas id="ink-layer"></canvas>
+      </div>
+      <div id="hand-cursor"></div>
+      <div id="smart-indicator">✨ Smart Shape: ON</div>
+
+      <div id="page-nav">
+        <button class="pnav-btn" id="btn-prev">‹</button>
+        <span id="page-label" style="font-size:12px;font-weight:600;width:40px;text-align:center">1 / 1</span>
+        <button class="pnav-btn" id="btn-next">›</button>
+      </div>
+
+      <div id="upload-prompt" class="hidden">
+        <div class="upload-box" id="upload-box-trigger">
+          <div style="font-size:40px;margin-bottom:12px">📁</div>
+          <div style="font-weight:600;font-size:15px;color:var(--navy)">Pilih PDF / Gambar</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="toolbar">
+      <button class="tb-btn active" id="tb-draw">✏️ Tulis</button>
+      <button class="tb-btn" id="tb-smart">📐 Smart Shape</button>
+      <div class="tb-sep"></div>
+      <div class="swatch selected" data-color="#1B2A4A" style="background:#1B2A4A"></div>
+      <div class="swatch" data-color="#C0392B" style="background:#C0392B"></div>
+      <div class="swatch" data-color="#2D6A4F" style="background:#2D6A4F"></div>
+      <div class="tb-sep"></div>
+      <input type="range" id="pen-thick" min="1" max="15" value="4" style="width:70px" />
+      <button class="tb-btn warning" id="tb-undo">↩️ Undo</button>
+      <button class="tb-btn danger" id="tb-clear">🗑️ Hapus</button>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+  <div id="loading">
+    <div class="spinner"></div>
+    <div style="margin-top:10px;font-size:13px;" id="load-msg">Memuat…</div>
+  </div>
+
   <script>
-    var vid = document.getElementById('vid');
-    var c = document.getElementById('c');
-    var ctx = c.getContext('2d');
-    var arr = [];
-    var cur = [];
-    var shift = false;
-    var draw = false;
-    var sx = null;
-    var sy = null;
+    'use strict';
+    const { jsPDF } = window.jspdf;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    window.onkeydown = function(e) {
-      if (e.key == 'Shift') shift = true;
-      if (e.code == 'Space') arr = [];
+    const $ = id => document.getElementById(id);
+
+    // Config
+    let currentMode = 'free', fileType = 'image', originalFileName = 'BioNotes';
+    let drawEnabled = true, smartShape = false;
+    let penColor = '#1B2A4A', penSize = 4;
+    let isDrawing = false;
+    let inkStore = new Map(); // pageIndex -> array of { type, color, size, points|cx|w... }
+    let currentPage = 1, totalPages = 1;
+    let pdfDoc = null, renderTask = null;
+
+    // Zoom & Drag State
+    let zoom = 1, layerX = 0, layerY = 0;
+    let initialPinchDist = null;
+    let draggingShape = null, dragOffsetX = 0, dragOffsetY = 0;
+
+    // Cursor
+    let sx = null, sy = null;
+
+    const docCanvas = $('doc-layer'), inkCanvas = $('ink-layer');
+    const docCtx = docCanvas.getContext('2d'), inkCtx = inkCanvas.getContext('2d');
+    const wrap = $('canvas-wrap'), layerCont = $('layer-container');
+
+    function toast(m) { $('toast').textContent = m; $('toast').classList.add('show'); setTimeout(() => $('toast').classList.remove('show'), 2000); }
+    function showLoad(m) { $('load-msg').textContent = m; $('loading').classList.add('show'); }
+    function hideLoad() { $('loading').classList.remove('show'); }
+    function swScr(s) { ['screen-landing', 'screen-editor'].forEach(id => $(id).classList.toggle('hidden', id !== s)); }
+
+    function resize() {
+      docCanvas.width = inkCanvas.width = wrap.clientWidth;
+      docCanvas.height = inkCanvas.height = wrap.clientHeight;
+      redrawInk();
+    } window.onresize = resize;
+
+    // Rendering
+    async function renderPDF(num) {
+      if (!pdfDoc) return;
+      if (renderTask) try { renderTask.cancel() } catch (e) { }
+      showLoad(`Memuat Hal ${num}…`);
+      const page = await pdfDoc.getPage(num);
+      const vp0 = page.getViewport({ scale: 1 });
+      const sc = Math.min(docCanvas.width / vp0.width, docCanvas.height / vp0.height) * 0.95;
+      const vp = page.getViewport({ scale: sc });
+
+      docCtx.clearRect(0, 0, docCanvas.width, docCanvas.height);
+      const xo = (docCanvas.width - vp.width) / 2, yo = (docCanvas.height - vp.height) / 2;
+      docCtx.fillStyle = '#fff'; docCtx.fillRect(xo, yo, vp.width, vp.height);
+
+      const off = document.createElement('canvas'); off.width = vp.width; off.height = vp.height;
+      renderTask = page.render({ canvasContext: off.getContext('2d'), viewport: vp });
+      await renderTask.promise;
+      docCtx.drawImage(off, xo, yo);
+      currentPage = num; $('page-label').textContent = `${num} / ${totalPages}`;
+      $('btn-prev').disabled = num <= 1; $('btn-next').disabled = num >= totalPages;
+      redrawInk(); hideLoad();
     }
-    
-    window.onkeyup = function(e) {
-      if (e.key == 'Shift') shift = false;
-    }
 
-    function run(res) {
-      c.width = window.innerWidth;
-      c.height = window.innerHeight;
-      ctx.drawImage(res.image, 0, 0, c.width, c.height);
-      ctx.fillStyle = 'rgba(10, 6, 2, 0.85)';
-      ctx.fillRect(0, 0, c.width, c.height);
+    // Drawing & Shapes
+    function redrawInk() {
+      inkCtx.clearRect(0, 0, inkCanvas.width, inkCanvas.height);
+      const st = inkStore.get(currentPage) || [];
+      const W = inkCanvas.width, H = inkCanvas.height;
 
-      ctx.shadowColor = '#F5D061';
-      ctx.shadowBlur = 15;
-      ctx.strokeStyle = '#F5D061';
-      ctx.lineWidth = 6;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
+      st.forEach(s => {
+        inkCtx.beginPath(); inkCtx.strokeStyle = s.color; inkCtx.lineWidth = s.size;
+        inkCtx.lineCap = 'round'; inkCtx.lineJoin = 'round';
 
-      for (var i = 0; i < arr.length; i++) {
-        ctx.beginPath();
-        for (var j = 0; j < arr[i].length; j++) {
-          if (j == 0) ctx.moveTo(arr[i][j].x, arr[i][j].y);
-          else ctx.lineTo(arr[i][j].x, arr[i][j].y);
+        if (s.type === 'line') {
+          inkCtx.moveTo(s.start.x * W, s.start.y * H); inkCtx.lineTo(s.end.x * W, s.end.y * H);
+        } else if (s.type === 'rect') {
+          inkCtx.rect(s.x * W, s.y * H, s.w * W, s.h * H);
+        } else if (s.type === 'circle') {
+          inkCtx.arc(s.cx * W, s.cy * H, s.r * Math.min(W, H), 0, Math.PI * 2);
+        } else if (s.points && s.points.length > 0) {
+          inkCtx.moveTo(s.points[0].x * W, s.points[0].y * H);
+          for (let i = 1; i < s.points.length; i++) inkCtx.lineTo(s.points[i].x * W, s.points[i].y * H);
         }
-        ctx.stroke();
+        inkCtx.stroke();
+      });
+    }
+
+    function processShape(strokeIndex) {
+      if (!smartShape) return;
+      const st = inkStore.get(currentPage);
+      if (!st || !st[strokeIndex]) return;
+      const s = st[strokeIndex];
+      if (s.type || !s.points || s.points.length < 10) return;
+
+      let pts = s.points, len = 0, mx = pts[0].x, kx = pts[0].x, my = pts[0].y, ky = pts[0].y;
+      for (let i = 1; i < pts.length; i++) {
+        len += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+        mx = Math.min(mx, pts[i].x); kx = Math.max(kx, pts[i].x);
+        my = Math.min(my, pts[i].y); ky = Math.max(ky, pts[i].y);
       }
+      const dist = Math.hypot(pts[pts.length - 1].x - pts[0].x, pts[pts.length - 1].y - pts[0].y);
+      const w = kx - mx, h = ky - my;
 
-      if (res.multiHandLandmarks && res.multiHandLandmarks.length > 0) {
-        var lm = res.multiHandLandmarks[0];
-        drawConnectors(ctx, lm, HAND_CONNECTIONS, {color: 'rgba(245, 208, 97, 0.3)', lineWidth: 2});
-        drawLandmarks(ctx, lm, {color: '#FFFFFF', lineWidth: 1, radius: 2});
-
-        var ind = lm[8];
-        var rx = ind.x * c.width;
-        var ry = ind.y * c.height;
-
-        if (sx == null) {
-          sx = rx; 
-          sy = ry;
-        } else {
-          sx += (rx - sx) * 0.45;
-          sy += (ry - sy) * 0.45;
-        }
-
-        ctx.beginPath();
-        ctx.arc(sx, sy, 6, 0, 2 * Math.PI);
-        if (shift) { 
-          ctx.fillStyle = '#FFFFFF'; 
-        } else { 
-          ctx.fillStyle = 'rgba(245, 208, 97, 0.4)'; 
-        }
-        ctx.fill();
-
-        if (shift) {
-          if (!draw) {
-            draw = true;
-            cur = [];
-            arr.push(cur);
-          }
-          cur.push({x: sx, y: sy});
-        } else {
-          draw = false;
+      if (dist > Math.max(w, h) * 0.3) {
+        // Line Check
+        if (dist / len > 0.88) {
+          st[strokeIndex] = { type: 'line', color: s.color, size: s.size, start: pts[0], end: pts[pts.length - 1] };
+          toast('📐 Garis Lurus Dikenali');
         }
       } else {
-        draw = false;
-        sx = null;
+        // Closed Shape (Circle or Rect)
+        const cx = mx + w / 2, cy = my + h / 2, r = (w + h) / 4;
+        let varR = 0;
+        pts.forEach(p => varR += Math.abs(Math.hypot(p.x - cx, p.y - cy) - r));
+        varR /= pts.length;
+
+        // Scale radii for circle to viewport safely
+        const rScaled = r * Math.max(inkCanvas.width, inkCanvas.height) / Math.min(inkCanvas.width, inkCanvas.height);
+
+        if (varR < r * 0.25) {
+          st[strokeIndex] = { type: 'circle', color: s.color, size: s.size, cx, cy, r: rScaled };
+          toast('⭕ Lingkaran Dikenali');
+        } else {
+          st[strokeIndex] = { type: 'rect', color: s.color, size: s.size, x: mx, y: my, w, h };
+          toast('🔲 Kotak Dikenali');
+        }
+      }
+      redrawInk();
+    }
+
+    function hitShape(nx, ny) {
+      const st = inkStore.get(currentPage) || [];
+      for (let i = st.length - 1; i >= 0; i--) {
+        const s = st[i]; const t = s.size / Math.min(inkCanvas.width, inkCanvas.height) + 0.03;
+        if (s.type === 'rect') {
+          if (nx >= s.x && nx <= s.x + s.w && ny >= s.y && ny <= s.y + s.h) return s;
+        } else if (s.type === 'circle') {
+          if (Math.hypot(nx - s.cx, ny - s.cy) < s.r + t) return s;
+        } else if (s.type === 'line') {
+          const xc = (s.start.x + s.end.x) / 2, yc = (s.start.y + s.end.y) / 2;
+          if (Math.hypot(nx - xc, ny - yc) < t * 2) return s;
+        }
+      } return null;
+    }
+
+    // Input Handlers
+    function getNormPt(cx, cy) {
+      const r = inkCanvas.getBoundingClientRect();
+      return { x: (cx - r.left) / r.width, y: (cy - r.top) / r.height };
+    }
+
+    function ptStart(nx, ny) {
+      draggingShape = hitShape(nx, ny);
+      if (draggingShape && !drawEnabled) {
+        if (draggingShape.type === 'rect') { dragOffsetX = nx - draggingShape.x; dragOffsetY = ny - draggingShape.y; }
+        else if (draggingShape.type === 'circle') { dragOffsetX = nx - draggingShape.cx; dragOffsetY = ny - draggingShape.cy; }
+        else if (draggingShape.type === 'line') { dragOffsetX = nx - draggingShape.start.x; dragOffsetY = ny - draggingShape.start.y; }
+        return;
+      }
+      if (!drawEnabled) return;
+      isDrawing = true;
+      if (!inkStore.has(currentPage)) inkStore.set(currentPage, []);
+      inkStore.get(currentPage).push({ type: 'path', color: penColor, size: penSize, points: [{ x: nx, y: ny }] });
+    }
+
+    function ptMove(nx, ny) {
+      if (draggingShape && !drawEnabled) {
+        if (draggingShape.type === 'rect') { draggingShape.x = nx - dragOffsetX; draggingShape.y = ny - dragOffsetY; }
+        else if (draggingShape.type === 'circle') { draggingShape.cx = nx - dragOffsetX; draggingShape.cy = ny - dragOffsetY; }
+        else if (draggingShape.type === 'line') {
+          const dw = draggingShape.end.x - draggingShape.start.x, dh = draggingShape.end.y - draggingShape.start.y;
+          draggingShape.start.x = nx - dragOffsetX; draggingShape.start.y = ny - dragOffsetY;
+          draggingShape.end.x = draggingShape.start.x + dw; draggingShape.end.y = draggingShape.start.y + dh;
+        }
+        redrawInk(); return;
+      }
+      if (!isDrawing) return;
+      const st = inkStore.get(currentPage);
+      const cur = st[st.length - 1];
+      cur.points.push({ x: nx, y: ny });
+      redrawInk();
+    }
+
+    function ptEnd() {
+      if (isDrawing && smartShape) {
+        const st = inkStore.get(currentPage);
+        processShape(st.length - 1);
+      }
+      isDrawing = false;
+      draggingShape = null;
+    }
+
+    // Touch Setup
+    inkCanvas.ontouchstart = e => {
+      e.preventDefault();
+      if (e.touches.length === 2) {
+        isDrawing = false;
+        initialPinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        return;
+      }
+      const pt = getNormPt(e.touches[0].clientX, e.touches[0].clientY);
+      ptStart(pt.x, pt.y);
+    };
+    inkCanvas.ontouchmove = e => {
+      e.preventDefault();
+      if (e.touches.length === 2 && initialPinchDist) {
+        const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        zoom += (dist - initialPinchDist) * 0.01;
+        zoom = Math.max(1, Math.min(zoom, 4));
+        initialPinchDist = dist;
+        layerCont.style.transform = `scale(${zoom})`;
+        return;
+      }
+      const pt = getNormPt(e.touches[0].clientX, e.touches[0].clientY);
+      ptMove(pt.x, pt.y);
+    };
+    inkCanvas.ontouchend = e => { initialPinchDist = null; ptEnd(); };
+
+    // ==== MOVE NAV LOGIC TO TOP (Safety) ====
+    $('btn-free-mode').onclick = () => {
+      currentMode = 'free'; fileType = 'image'; currentPage = 1; inkStore.clear(); zoom = 1; layerCont.style.transform = 'scale(1)';
+      $('mode-badge').textContent = 'Kanvas AI'; swScr('screen-editor'); resize();
+    };
+    $('btn-doc-mode').onclick = () => {
+      currentMode = 'doc'; fileType = ''; $('upload-prompt').classList.remove('hidden'); zoom = 1; layerCont.style.transform = 'scale(1)';
+      $('mode-badge').textContent = 'Anotasi Dokumen'; $('btn-upload-top').style.display = 'flex';
+      swScr('screen-editor'); resize();
+    };
+    $('tb-draw').onclick = () => { drawEnabled = !drawEnabled; $('tb-draw').classList.toggle('active', drawEnabled); };
+    $('tb-smart').onclick = () => { smartShape = !smartShape; updateSmartUI(); };
+    $('tb-undo').onclick = undoStroke;
+    $('tb-clear').onclick = () => { inkStore.set(currentPage, []); redrawInk(); };
+    $('upload-box-trigger').onclick = () => $('file-input').click();
+    $('btn-upload-top').onclick = () => $('file-input').click();
+
+    // MediaPipe
+    const handsVersion = '0.4.1675466740'; // Latest stable known
+    const hands = new Hands({
+      locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+    });
+    hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.4, minTrackingConfidence: 0.4 });
+
+    let lastUndo = 0, lastShapeTog = 0;
+    hands.onResults(res => {
+      if (!$('screen-landing').classList.contains('hidden')) return;
+      redrawInk();
+
+      if (res.multiHandLandmarks && res.multiHandLandmarks.length > 0) {
+        const lm = res.multiHandLandmarks[0];
+        const tip = lm[8], thumb = lm[4];
+
+        // Mirror Coord
+        const r = inkCanvas.getBoundingClientRect();
+        const rx = (1 - tip.x) * r.width, ry = tip.y * r.height;
+        if (sx === null) { sx = rx; sy = ry } else { sx += (rx - sx) * 0.4; sy += (ry - sy) * 0.4 }
+
+        $('hand-cursor').style.left = (sx + r.left) + 'px';
+        $('hand-cursor').style.top = (sy + r.top) + 'px';
+        $('hand-cursor').style.opacity = '1';
+
+        if (currentMode === 'free') {
+          const mlm = lm.map(p => ({ ...p, x: 1 - p.x }));
+          drawConnectors(inkCtx, mlm, HAND_CONNECTIONS, { color: 'rgba(163,177,138,0.4)', lineWidth: 3 });
+          drawLandmarks(inkCtx, mlm, { color: '#A3B18A', lineWidth: 1, radius: 2 });
+        }
+
+        // Gestures
+        const iUp = lm[8].y < lm[6].y, mUp = lm[12].y < lm[10].y, rUp = lm[16].y < lm[14].y, pUp = lm[20].y < lm[18].y;
+        const isV = iUp && mUp && !rUp && !pUp;
+        const isFive = iUp && mUp && rUp && pUp;
+        const isPoint = iUp && !mUp && !rUp && !pUp;
+        const pinch = Math.hypot(tip.x - thumb.x, tip.y - thumb.y) < 0.05;
+
+        const nx = sx / r.width, ny = sy / r.height;
+
+        const now = Date.now();
+        if (isV) { // Undo Gesture
+          if (now - lastUndo > 1500) { undoStroke(); lastUndo = now; }
+          ptEnd();
+        } else if (isFive) { // Open Palm -> Toggle Smart Shape
+          if (now - lastShapeTog > 2000) {
+            smartShape = !smartShape;
+            updateSmartUI(); toast(smartShape ? '✨ Auto-Shape ON' : 'Auto-Shape OFF');
+            lastShapeTog = now;
+          }
+          ptEnd();
+        } else if (isPoint && !pinch && drawEnabled) {
+          if (!isDrawing) ptStart(nx, ny); else ptMove(nx, ny);
+          $('hand-cursor').classList.add('active');
+        } else {
+          ptEnd();
+          $('hand-cursor').classList.remove('active');
+        }
+      } else {
+        ptEnd(); $('hand-cursor').style.opacity = '0'; sx = sy = null;
+      }
+    });
+
+    // ==== ROBUST CAMERA INITIALIZATION (ROOT CAUSE FIX) ====
+    const camStatusEl = $('cam-status');
+    const camHintEl = $('cam-hint');
+    const btnStart = $('btn-start-camera');
+    const btnSkip = $('btn-skip-camera');
+
+    function setCamStatus(icon, msg, color) {
+      camStatusEl.innerHTML = `<span style="color:${color || 'var(--text-muted)'}">${icon} ${msg}</span>`;
+    }
+    function setCamHint(msg) {
+      camHintEl.textContent = msg;
+      camHintEl.style.display = msg ? 'block' : 'none';
+    }
+
+    // Step 1: Check Secure Context
+    const isLocalhost = ['localhost', '127.0.0.1'].includes(location.hostname);
+    if (!window.isSecureContext && !isLocalhost) {
+      setCamStatus('🔒', 'Kamera hanya aktif di HTTPS atau localhost.', '#C0392B');
+      setCamHint('Gunakan http://localhost:5050 atau deploy ke HTTPS.');
+      btnStart.style.display = 'none';
+    }
+
+    // Step 2: Check if MediaPipe libs are loaded
+    const libsOk = typeof Hands !== 'undefined' && typeof Camera !== 'undefined';
+    if (!libsOk) {
+      setCamStatus('❌', 'Library AI gagal dimuat dari CDN.', '#C0392B');
+      setCamHint('Pastikan koneksi internet aktif, lalu Refresh (F5).');
+      btnStart.style.display = 'none';
+    }
+
+    let activeStream = null;
+    let rafId = null;
+
+    // Stop camera cleanly
+    function stopCamera() {
+      if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+      if (activeStream) { activeStream.getTracks().forEach(t => t.stop()); activeStream = null; }
+      camEl.srcObject = null;
+    }
+
+    // Drive MediaPipe with rAF after stream is live — avoids re-opening camera
+    function startHandLoop() {
+      async function loop() {
+        if (!activeStream) return;
+        if (camEl.readyState >= 2) {
+          try { await hands.send({ image: camEl }); } catch (e) { }
+        }
+        rafId = requestAnimationFrame(loop);
+      }
+      rafId = requestAnimationFrame(loop);
+    }
+
+    // THE FIX: get stream ONCE via getUserMedia, keep it alive, feed to rAF loop
+    async function requestCameraPermission() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setCamStatus('❌', 'Browser tidak mendukung akses kamera.', '#C0392B');
+        setCamHint('Gunakan Chrome atau Edge versi terbaru.');
+        return;
+      }
+      setCamStatus('⏳', 'Menunggu izin kamera...', 'var(--text-muted)');
+      btnStart.disabled = true;
+      stopCamera(); // clean up any previous attempt
+
+      try {
+        // ONE call — gets permission popup AND the live stream
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }
+        });
+        activeStream = stream;
+
+        // Pipe stream to hidden processing video
+        camEl.srcObject = stream;
+        // Also pipe to visible background layer (for free mode AR background)
+        const camLayer = $('cam-layer');
+        if (camLayer) camLayer.srcObject = stream;
+
+        setCamStatus('⏳', 'Memuat model AI...', 'var(--text-muted)');
+        btnStart.style.display = 'none';
+
+        // Wait for video to be ready, then start hand detection loop
+        camEl.onloadedmetadata = () => {
+          camEl.play().then(() => {
+            if (camLayer) camLayer.play().catch(() => { });
+            setCamStatus('✅', 'AI & Kamera Aktif!', 'var(--sage-dark)');
+            btnSkip.style.display = 'none';
+            setCamHint('');
+            startHandLoop();
+          }).catch(e => setCamStatus('⚠️', 'Video gagal: ' + e.message, '#D68910'));
+        };
+
+      } catch (err) {
+        btnStart.disabled = false;
+        console.error('Camera error:', err.name, err.message);
+        const hints = {
+          NotAllowedError: ['🚫', 'Izin kamera ditolak.', 'Klik gembok 🔒 di URL → Camera → Allow, lalu Aktifkan Kamera.'],
+          NotFoundError: ['❌', 'Tidak ada kamera terdeteksi.', 'Pastikan kamera terhubung ke perangkat.'],
+          NotReadableError: ['⚠️', 'Kamera dipakai aplikasi lain.', 'Tutup Zoom/Teams/dll lalu coba lagi.'],
+        };
+        const [icon, msg, hint] = hints[err.name] || ['❌', err.message || 'Gagal akses kamera.', ''];
+        setCamStatus(icon, msg, '#C0392B');
+        setCamHint(hint);
+        btnStart.textContent = '🔄 Coba Lagi';
+        btnStart.style.display = 'inline-block';
+        btnStart.style.display = 'inline-block';
       }
     }
 
-    var h = new Hands({
-      locateFile: (file) => {
-        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
-      }
-    });
-    
-    h.setOptions({ 
-      maxNumHands: 1, 
-      modelComplexity: 1, 
-      minDetectionConfidence: 0.5, 
-      minTrackingConfidence: 0.5 
-    });
-    
-    h.onResults(run);
+    // Wire buttons
+    btnStart.onclick = requestCameraPermission;
+    btnSkip.onclick = () => {
+      stopCamera();
+      setCamStatus('✏️', 'Mode Sentuh Aktif (Tanpa Kamera)', 'var(--sage-dark)');
+      setCamHint('');
+      btnStart.style.display = 'none';
+      btnSkip.style.display = 'none';
+      toast('Mode Sentuh Aktif');
+    };
 
-    var cam = new Camera(vid, {
-      onFrame: async () => { await h.send({image: vid}); },
-      width: 1280, 
-      height: 720
+    // Auto init
+    if (libsOk && (window.isSecureContext || isLocalhost)) {
+      setCamStatus('📷', 'Akses kamera tersedia', 'var(--text-muted)');
+      btnStart.style.display = 'inline-block';
+      setTimeout(async () => {
+        try {
+          const perm = await navigator.permissions.query({ name: 'camera' });
+          if (perm.state === 'granted') requestCameraPermission();
+        } catch (e) { }
+      }, 500);
+    } else if (!libsOk) {
+      setCamStatus('❌', 'Library AI gagal dimuat', '#CC0000');
+    } else {
+      setCamStatus('🔒', 'Buka via localhost:5050', '#CC0000');
+    }
+
+    // UI Actions
+    function undoStroke() {
+      const st = inkStore.get(currentPage);
+      if (st && st.length > 0) { st.pop(); redrawInk(); toast('↩️ Undo'); }
+    }
+    function updateSmartUI() {
+      $('tb-smart').classList.toggle('active', smartShape);
+      $('smart-indicator').style.display = smartShape ? 'block' : 'none';
+    }
+
+    $('tb-draw').onclick = () => { drawEnabled = !drawEnabled; $('tb-draw').classList.toggle('active', drawEnabled); };
+    $('tb-smart').onclick = () => { smartShape = !smartShape; updateSmartUI(); };
+    $('tb-undo').onclick = undoStroke;
+    $('tb-clear').onclick = () => { inkStore.set(currentPage, []); redrawInk(); };
+
+    document.querySelectorAll('.swatch').forEach(sw => sw.onclick = () => {
+      document.querySelectorAll('.swatch').forEach(s => s.classList.remove('selected'));
+      sw.classList.add('selected'); penColor = sw.dataset.color;
     });
-    
-    cam.start();
+    $('pen-thick').oninput = e => penSize = parseInt(e.target.value);
+
+    $('file-input').onchange = async e => {
+      const f = e.target.files[0]; if (!f) return;
+      originalFileName = f.name.split('.')[0]; $('doc-name').textContent = f.name; $('upload-prompt').classList.add('hidden');
+      inkStore.clear(); zoom = 1; layerCont.style.transform = 'scale(1)';
+
+      if (f.type === 'application/pdf') {
+        fileType = 'pdf'; showLoad('Membuka PDF…');
+        const buf = await f.arrayBuffer(); pdfDoc = await pdfjsLib.getDocument({ data: buf }).promise;
+        totalPages = pdfDoc.numPages; await renderPDF(1); $('page-nav').classList.add('visible');
+      } else {
+        fileType = 'image'; totalPages = 1; currentPage = 1;
+        const img = new Image(); img.src = URL.createObjectURL(f);
+        img.onload = () => {
+          docCanvas.width = inkCanvas.width = wrap.clientWidth; docCanvas.height = inkCanvas.height = wrap.clientHeight;
+          const sc = Math.min(docCanvas.width / img.width, docCanvas.height / img.height) * 0.95;
+          const dw = img.width * sc, dh = img.height * sc, xo = (docCanvas.width - dw) / 2, yo = (docCanvas.height - dh) / 2;
+          docCtx.clearRect(0, 0, docCanvas.width, docCanvas.height); docCtx.drawImage(img, xo, yo, dw, dh);
+          URL.revokeObjectURL(img.src); hideLoad(); redrawInk();
+        }; $('page-nav').classList.remove('visible');
+      }
+    };
+
+    $('btn-prev').onclick = () => { if (currentPage > 1) renderPDF(currentPage - 1); };
+    $('btn-next').onclick = () => { if (currentPage < totalPages) renderPDF(currentPage + 1); };
+    $('btn-home').onclick = () => swScr('screen-landing');
+
+    $('btn-save').onclick = async () => {
+      showLoad('Menyimpan…');
+      // Smart Export Logic
+      if (fileType === 'pdf') {
+        const doc = new jsPDF({ unit: 'px' }); const temp = document.createElement('canvas'); const ctx = temp.getContext('2d');
+        for (let i = 1; i <= totalPages; i++) {
+          const page = await pdfDoc.getPage(i); const vp = page.getViewport({ scale: 2 });
+          temp.width = vp.width; temp.height = vp.height;
+          await page.render({ canvasContext: ctx, viewport: vp }).promise;
+          const st = inkStore.get(i) || []; const sc = Math.min(docCanvas.width / (vp.width / 2), docCanvas.height / (vp.height / 2)) * 0.95;
+          ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+          st.forEach(s => {
+            ctx.beginPath(); ctx.strokeStyle = s.color; ctx.lineWidth = s.size * (vp.width / docCanvas.width);
+            const dx = px => (px * docCanvas.width - (docCanvas.width - (vp.width / 2 * sc)) / 2) / sc * 2;
+            const dy = py => (py * docCanvas.height - (docCanvas.height - (vp.height / 2 * sc)) / 2) / sc * 2;
+            if (s.type === 'line') { ctx.moveTo(dx(s.start.x), dy(s.start.y)); ctx.lineTo(dx(s.end.x), dy(s.end.y)); }
+            else if (s.type === 'rect') { ctx.rect(dx(s.x), dy(s.y), s.w * docCanvas.width / sc * 2, s.h * docCanvas.height / sc * 2); }
+            else if (s.type === 'circle') { ctx.arc(dx(s.cx), dy(s.cy), s.r * Math.min(docCanvas.width, docCanvas.height) / sc * 2, 0, Math.PI * 2); }
+            else {
+              ctx.moveTo(dx(s.points[0].x), dy(s.points[0].y));
+              s.points.forEach(p => ctx.lineTo(dx(p.x), dy(p.y)));
+            }
+            ctx.stroke();
+          });
+          if (i > 1) doc.addPage([vp.width, vp.height], vp.width > vp.height ? 'l' : 'p');
+          else { doc.deletePage(1); doc.addPage([vp.width, vp.height], vp.width > vp.height ? 'l' : 'p'); }
+          doc.addImage(temp.toDataURL('image/jpeg', 0.8), 'JPEG', 0, 0, vp.width, vp.height);
+        }
+        doc.save(originalFileName + '-AI.pdf');
+      } else {
+        const out = document.createElement('canvas'); out.width = docCanvas.width; out.height = docCanvas.height;
+        const ctx = out.getContext('2d');
+        if (currentMode === 'free') {
+          ctx.save(); ctx.translate(out.width, 0); ctx.scale(-1, 1); ctx.drawImage(camEl, 0, 0, out.width, out.height); ctx.restore();
+          ctx.fillStyle = 'rgba(249,249,249,0.1)'; ctx.fillRect(0, 0, out.width, out.height);
+        } else { ctx.fillStyle = '#f9f9f9'; ctx.fillRect(0, 0, out.width, out.height); ctx.drawImage(docCanvas, 0, 0); }
+        ctx.drawImage(inkCanvas, 0, 0);
+        const a = document.createElement('a'); a.download = originalFileName + '-AI.jpg'; a.href = out.toDataURL('image/jpeg', 0.9); a.click();
+      }
+      hideLoad(); toast('✅ Export Sukses');
+    };
+    resize();
   </script>
 </body>
+
 </html>
