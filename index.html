@@ -799,8 +799,7 @@
           // Jika sudutnya terlalu banyak, berarti mulus -> anggap Lingkaran
           const cx = mx + w / 2, cy = my + h / 2;
           const r = (w + h) / 4;
-          const rScaled = r * Math.max(inkCanvas.width, inkCanvas.height) / Math.min(inkCanvas.width, inkCanvas.height);
-          st[strokeIndex] = { type: 'circle', color: s.color, size: s.size, cx, cy, r: rScaled };
+          st[strokeIndex] = { type: 'circle', color: s.color, size: s.size, cx, cy, r, w, h };
           toast('⭕ Lingkaran');
         }
       }
