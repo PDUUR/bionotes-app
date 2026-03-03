@@ -685,6 +685,12 @@
         } else if (s.type === 'circle') {
           // Use max bounding box for precise circle scale
           inkCtx.arc(s.cx * W, s.cy * H, Math.max(s.w * W, s.h * H) / 2, 0, Math.PI * 2);
+        } else if (s.type === 'polygon' && s.polyPoints) {
+          inkCtx.moveTo(s.polyPoints[0].x * W, s.polyPoints[0].y * H);
+          for (let i = 1; i < s.polyPoints.length; i++) {
+            inkCtx.lineTo(s.polyPoints[i].x * W, s.polyPoints[i].y * H);
+          }
+          inkCtx.closePath();
         } else if (s.points && s.points.length > 0) {
           inkCtx.moveTo(s.points[0].x * W, s.points[0].y * H);
           for (let i = 1; i < s.points.length; i++) inkCtx.lineTo(s.points[i].x * W, s.points[i].y * H);
@@ -694,15 +700,50 @@
       inkCtx.globalCompositeOperation = 'source-over'; // safety reset
     }
 
+    // Simplifikasi manual (Ramer-Douglas-Peucker sederhana)
+    function simplifyPath(pts, tolerance) {
+      if (pts.length < 3) return pts;
+      let dmax = 0, index = 0;
+      const end = pts.length - 1;
+
+      const p1 = pts[0], p2 = pts[end];
+      const lengthSq = Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2);
+
+      for (let i = 1; i < end; i++) {
+        const p = pts[i];
+        let d = 0;
+        if (lengthSq === 0) {
+          d = Math.hypot(p.x - p1.x, p.y - p1.y);
+        } else {
+          const t = ((p.x - p1.x) * (p2.x - p1.x) + (p.y - p1.y) * (p2.y - p1.y)) / lengthSq;
+          const projX = p1.x + t * (p2.x - p1.x);
+          const projY = p1.y + t * (p2.y - p1.y);
+          d = Math.hypot(p.x - projX, p.y - projY);
+        }
+
+        if (d > dmax) { index = i; dmax = d; }
+      }
+
+      if (dmax > tolerance) {
+        const res1 = simplifyPath(pts.slice(0, index + 1), tolerance);
+        const res2 = simplifyPath(pts.slice(index), tolerance);
+        return res1.slice(0, res1.length - 1).concat(res2);
+      } else {
+        return [pts[0], pts[end]];
+      }
+    }
+
     function processShape(strokeIndex) {
       if (!smartShape) return;
       const st = inkStore.get(currentPage);
       if (!st || !st[strokeIndex] || !st[strokeIndex].points) return;
       const s = st[strokeIndex];
-      // Validasi ketat sesuai perintah agar tipe path saja yang diteruskan
+      // Hanya proses tipe path manual
       if (s.type !== 'path' || !s.points || s.points.length < 10) return;
 
       const pts = s.points;
+
+      // Hitung Bounding Box & Keliling
       let len = 0, mx = pts[0].x, kx = pts[0].x, my = pts[0].y, ky = pts[0].y;
       for (let i = 1; i < pts.length; i++) {
         len += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
@@ -713,9 +754,10 @@
       const start = pts[0], end = pts[pts.length - 1];
       const dist = Math.hypot(end.x - start.x, end.y - start.y);
       const w = kx - mx, h = ky - my;
+      const diag = Math.hypot(w, h);
 
-      // LINE DETECTION: 0.65 (Sensitivitas dipertajam agar gampang deteksi garis lurus)
-      if (dist / len > 0.65 || dist > Math.max(w, h) * 0.8) {
+      // 1. GARIS LURUS Cepat
+      if (dist / len > 0.65 || dist > diag * 0.8) {
         let finalStart = { ...start };
         let finalEnd = { ...end };
 
@@ -726,26 +768,43 @@
 
         st[strokeIndex] = { type: 'line', color: s.color, size: s.size, start: finalStart, end: finalEnd };
         toast('📐 Garis Lurus');
+        redrawInk();
+        return;
       }
-      // SHAPE DETECTION
-      else if (dist < Math.max(w, h) * 0.6) {
-        const cx = mx + w / 2, cy = my + h / 2;
-        const r = (w + h) / 4;
 
-        let varR = 0;
-        pts.forEach(p => varR += Math.abs(Math.hypot(p.x - cx, p.y - cy) - r));
-        varR /= pts.length;
+      // SIMPLIFIKASI ALGORITMA (Cari Sudut/Corner Poligon)
+      // Toleransi didasarkan pada skala gambar
+      const tolerance = Math.max(w, h) * 0.08;
+      let corners = simplifyPath(pts, tolerance);
 
-        // HIGH TOLERANCE FOR CIRCLE: diset ke 0.45 sesuai request
-        const aspect = w / (h || 0.001);
-        if (varR < r * 0.45 && aspect > 0.4 && aspect < 2.5) {
-          st[strokeIndex] = { type: 'circle', color: s.color, size: s.size, cx, cy, r, w, h };
-          toast('⭕ Lingkaran');
+      // Hapus titik sudut tambahan jika start-end menutup rapat (jarak < 10% diagonal)
+      if (Math.hypot(corners[0].x - corners[corners.length - 1].x, corners[0].y - corners[corners.length - 1].y) < diag * 0.15) {
+        corners.pop(); // buang ujung agar bisa di-closePath()
+      }
+
+      const nCor = corners.length;
+
+      // KLASIFIKASI POLIGON
+      if (dist < diag * 0.6) { // Jika bentuk garis cenderung tertutup
+        if (nCor === 3) {
+          st[strokeIndex] = { type: 'polygon', color: s.color, size: s.size, polyPoints: corners };
+          toast('🔺 Segitiga');
+        } else if (nCor === 4) {
+          st[strokeIndex] = { type: 'polygon', color: s.color, size: s.size, polyPoints: corners };
+          toast('🔲 Segiempat / Belah Ketupat');
+        } else if (nCor >= 5 && nCor <= 8) {
+          st[strokeIndex] = { type: 'polygon', color: s.color, size: s.size, polyPoints: corners };
+          toast(`🔷 Poligon ${nCor} Sudut`);
         } else {
-          st[strokeIndex] = { type: 'rect', color: s.color, size: s.size, x: mx, y: my, w, h };
-          toast('🔲 Kotak');
+          // Jika sudutnya terlalu banyak, berarti mulus -> anggap Lingkaran
+          const cx = mx + w / 2, cy = my + h / 2;
+          const r = (w + h) / 4;
+          const rScaled = r * Math.max(inkCanvas.width, inkCanvas.height) / Math.min(inkCanvas.width, inkCanvas.height);
+          st[strokeIndex] = { type: 'circle', color: s.color, size: s.size, cx, cy, r: rScaled };
+          toast('⭕ Lingkaran');
         }
       }
+
       redrawInk();
     }
 
